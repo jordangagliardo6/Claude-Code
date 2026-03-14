@@ -1,5 +1,5 @@
 {
-  "name": "Business Outreach Agent (Apify + Ringless VM + Google Sheets)",
+  "name": "Business Outreach Agent (Apify + Apollo Owner Enrichment + Ringless VM)",
   "nodes": [
     {
       "parameters": {},
@@ -54,6 +54,12 @@
               "name": "voicemailAudioURL",
               "value": "https://YOUR_HOSTING/voicemail.mp3",
               "type": "string"
+            },
+            {
+              "id": "apollo-api-key",
+              "name": "apolloApiKey",
+              "value": "YOUR_APOLLO_API_KEY",
+              "type": "string"
             }
           ]
         }
@@ -68,14 +74,12 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.apify.com/v2/acts/compass~crawler-google-places/runs",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpQueryAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
               "name": "token",
-              "value": "={{ $credentials.apifyApiToken }}"
+              "value": "YOUR_APIFY_API_TOKEN"
             }
           ]
         },
@@ -110,13 +114,7 @@
       "name": "Apify – Start Scrape Run",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [700, 400],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "apify-creds",
-          "name": "Apify API Token"
-        }
-      }
+      "position": [700, 400]
     },
     {
       "parameters": {
@@ -138,7 +136,7 @@
           "parameters": [
             {
               "name": "token",
-              "value": "={{ $credentials.apifyApiToken }}"
+              "value": "YOUR_APIFY_API_TOKEN"
             },
             {
               "name": "limit",
@@ -156,23 +154,61 @@
       "name": "Apify – Fetch Results",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1180, 400],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "apify-creds",
-          "name": "Apify API Token"
-        }
-      }
+      "position": [1180, 400]
     },
     {
       "parameters": {
-        "jsCode": "// Parse and clean Apify Google Maps results\nconst rawItems = $input.all();\nconst config = $('Search Config').first().json;\n\nconst cleaned = [];\n\nfor (const item of rawItems) {\n  const d = item.json;\n\n  // Skip entries without a phone number\n  const phone = (d.phone || d.phoneUnformatted || '').replace(/\\D/g, '');\n  if (phone.length < 10) continue;\n\n  // Skip chains / large franchises (many reviews = not a small owner)\n  const reviewCount = d.reviewsCount || d.totalScore || 0;\n  if (reviewCount > 500) continue;\n\n  cleaned.push({\n    businessName: d.title || '',\n    ownerName: '',            // Apify doesn't always return owner — enrichment step\n    phone: phone,\n    formattedPhone: d.phone || '',\n    address: d.address || '',\n    city: config.city,\n    state: config.state,\n    website: d.website || '',\n    rating: d.totalScore || '',\n    reviewCount: d.reviewsCount || 0,\n    category: (d.categories && d.categories[0]) || config.niche,\n    googleMapsUrl: d.url || '',\n    dateAdded: new Date().toISOString().split('T')[0],\n    vmSent: 'No',\n    vmDate: '',\n    status: 'New',\n    notes: ''\n  });\n}\n\nreturn cleaned.map(item => ({ json: item }));\n"
+        "jsCode": "// Parse and clean Apify Google Maps results\nconst rawItems = $input.all();\nconst config = $('Search Config').first().json;\n\nconst cleaned = [];\n\nfor (const item of rawItems) {\n  const d = item.json;\n\n  // Skip entries without a phone number\n  const phone = (d.phone || d.phoneUnformatted || '').replace(/\\D/g, '');\n  if (phone.length < 10) continue;\n\n  // Skip chains / large franchises (500+ reviews = not a small owner)\n  const reviewCount = d.reviewsCount || 0;\n  if (reviewCount > 500) continue;\n\n  cleaned.push({\n    businessName: d.title || '',\n    ownerName: '',\n    ownerPhone: '',\n    phone: phone,\n    phoneType: '',\n    formattedPhone: d.phone || '',\n    address: d.address || '',\n    city: config.city,\n    state: config.state,\n    website: d.website || '',\n    rating: d.totalScore || '',\n    reviewCount: reviewCount,\n    category: (d.categories && d.categories[0]) || config.niche,\n    googleMapsUrl: d.url || '',\n    dateAdded: new Date().toISOString().split('T')[0],\n    vmSent: 'No',\n    vmDate: '',\n    status: 'New',\n    notes: ''\n  });\n}\n\nreturn cleaned.map(item => ({ json: item }));\n"
       },
       "id": "a1b2c3d4-0006-0006-0006-a1b2c3d40006",
       "name": "Process & Clean Leads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1420, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/people/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"api_key\": \"{{ $('Search Config').first().json.apolloApiKey }}\",\n  \"q_organization_name\": \"{{ $json.businessName }}\",\n  \"person_titles\": [\"owner\", \"founder\", \"president\", \"ceo\", \"operator\", \"proprietor\", \"managing director\"],\n  \"person_locations\": [\"{{ $json.city }}, {{ $json.state }}\"],\n  \"per_page\": 1\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-0023-0023-0023-a1b2c3d40023",
+      "name": "Apollo – Find Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1660, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Apollo owner data with the original lead\n// $input.first().json = Apollo API response for this lead\n// $('Process & Clean Leads').item.json = original lead (paired by item index)\n\nconst apolloResponse = $input.first().json;\nconst originalLead = $('Process & Clean Leads').item.json;\n\nlet ownerName = '';\nlet ownerPhone = '';\nlet phoneType = '';\n\n// Parse Apollo response\nconst people = apolloResponse.people || [];\nif (people.length > 0) {\n  const person = people[0];\n  ownerName = person.name || '';\n\n  // Prefer mobile > direct_phone > any other type\n  const phones = person.phone_numbers || [];\n  const mobileNum = phones.find(p => p.type === 'mobile');\n  const directNum = phones.find(p => p.type === 'direct_phone');\n  const anyNum = phones[0];\n\n  const best = mobileNum || directNum || anyNum;\n  if (best) {\n    ownerPhone = (best.sanitized_number || best.raw_number || '').replace(/\\D/g, '');\n    phoneType = mobileNum ? 'Owner Mobile'\n               : directNum ? 'Owner Direct'\n               : 'Apollo Found';\n  }\n}\n\n// Decide final number and label\nlet finalPhone, finalPhoneType;\nif (ownerPhone && ownerPhone.length >= 10) {\n  // Apollo found an owner number — use it\n  finalPhone = ownerPhone;\n  finalPhoneType = phoneType;\n} else if (originalLead.reviewCount <= 30) {\n  // Very small operation — the person answering IS the owner\n  finalPhone = originalLead.phone;\n  finalPhoneType = 'Owner-Operated (Business #)';\n} else {\n  // Larger business, no owner found — business line, likely screened\n  finalPhone = originalLead.phone;\n  finalPhoneType = 'Business Line (Screened)';\n}\n\nreturn [{\n  json: {\n    ...originalLead,\n    ownerName: ownerName,\n    ownerPhone: ownerPhone,\n    phone: finalPhone,\n    phoneType: finalPhoneType\n  }\n}];\n"
+      },
+      "id": "a1b2c3d4-0024-0024-0024-a1b2c3d40024",
+      "name": "Merge Owner Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1900, 400]
     },
     {
       "parameters": {
@@ -192,7 +228,7 @@
       "name": "Google Sheets – Read Existing",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1660, 400],
+      "position": [2140, 400],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-creds",
@@ -202,13 +238,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Deduplicate: only keep leads whose phone isn't already in the sheet\nconst existingRows = $('Google Sheets – Read Existing').all();\nconst newLeads = $('Process & Clean Leads').all();\n\nconst existingPhones = new Set(\n  existingRows\n    .map(r => (r.json.phone || '').replace(/\\D/g, ''))\n    .filter(Boolean)\n);\n\nconst uniqueLeads = newLeads.filter(lead => {\n  const phone = (lead.json.phone || '').replace(/\\D/g, '');\n  return phone && !existingPhones.has(phone);\n});\n\nconsole.log(`Found ${newLeads.length} leads, ${uniqueLeads.length} are new.`);\nreturn uniqueLeads;\n"
+        "jsCode": "// Deduplicate: keep only leads whose phone isn't already in the sheet\n// Input comes from Merge Owner Data (all items)\nconst existingRows = $('Google Sheets – Read Existing').all();\nconst newLeads = $('Merge Owner Data').all();\n\nconst existingPhones = new Set(\n  existingRows\n    .map(r => (r.json.Phone || r.json.phone || '').replace(/\\D/g, ''))\n    .filter(Boolean)\n);\n\nconst uniqueLeads = newLeads.filter(lead => {\n  const phone = (lead.json.phone || '').replace(/\\D/g, '');\n  return phone && !existingPhones.has(phone);\n});\n\nconsole.log(`Enriched leads: ${newLeads.length}, new after dedup: ${uniqueLeads.length}`);\nreturn uniqueLeads;\n"
       },
       "id": "a1b2c3d4-0008-0008-0008-a1b2c3d40008",
       "name": "Filter Duplicates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1900, 400]
+      "position": [2380, 400]
     },
     {
       "parameters": {
@@ -236,7 +272,7 @@
       "name": "Any New Leads?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2140, 400]
+      "position": [2620, 400]
     },
     {
       "parameters": {
@@ -257,7 +293,9 @@
             "Business Name": "={{ $json.businessName }}",
             "Owner Name": "={{ $json.ownerName }}",
             "Phone": "={{ $json.phone }}",
-            "Formatted Phone": "={{ $json.formattedPhone }}",
+            "Phone Type": "={{ $json.phoneType }}",
+            "Owner Mobile (Apollo)": "={{ $json.ownerPhone }}",
+            "Business Phone": "={{ $json.formattedPhone }}",
             "Address": "={{ $json.address }}",
             "City": "={{ $json.city }}",
             "State": "={{ $json.state }}",
@@ -279,7 +317,7 @@
       "name": "Google Sheets – Add New Leads",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [2380, 300],
+      "position": [2860, 300],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-creds",
@@ -322,7 +360,7 @@
       "name": "Google Sheets – Get Uncontacted",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [2620, 300],
+      "position": [3100, 300],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-creds",
@@ -341,7 +379,7 @@
       "name": "Loop Each Lead",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [2860, 300]
+      "position": [3340, 300]
     },
     {
       "parameters": {
@@ -349,7 +387,7 @@
         "messages": {
           "values": [
             {
-              "content": "=You are an AI assistant helping prioritize leads for an AI automation agency cold outreach campaign.\n\nLead info:\n- Business: {{ $json['Business Name'] }}\n- Category: {{ $json['Category'] }}\n- Rating: {{ $json['Rating'] }} stars ({{ $json['Review Count'] }} reviews)\n- City: {{ $json['City'] }}, {{ $json['State'] }}\n- Website: {{ $json['Website'] }}\n\nRespond ONLY with valid JSON in this exact format:\n{\n  \"priority\": \"High|Medium|Low\",\n  \"reason\": \"1 sentence\",\n  \"vmHook\": \"10-15 word personalized hook for voicemail opening based on their business type\",\n  \"skipOutreach\": false\n}\n\nRules:\n- High priority: small local business, few reviews, no website or basic website (likely needs automation)\n- Low priority: franchises, chains, already tech-forward businesses\n- skipOutreach: true only if clearly a chain/franchise or irrelevant"
+              "content": "=You are an AI assistant helping prioritize leads for an AI automation agency cold outreach.\n\nLead info:\n- Business: {{ $json['Business Name'] }}\n- Owner Name: {{ $json['Owner Name'] || 'Unknown' }}\n- Category: {{ $json['Category'] }}\n- Rating: {{ $json['Rating'] }} stars ({{ $json['Review Count'] }} reviews)\n- City: {{ $json['City'] }}, {{ $json['State'] }}\n- Website: {{ $json['Website'] }}\n- Phone Type: {{ $json['Phone Type'] }}\n\nPhone type context:\n- \"Owner Mobile\" or \"Owner Direct\" = you are reaching the OWNER personally on their cell\n- \"Owner-Operated (Business #)\" = tiny shop, owner answers their own phone\n- \"Business Line (Screened)\" = receptionist may screen — needs stronger VM\n\nRespond ONLY with valid JSON in this exact format:\n{\n  \"priority\": \"High|Medium|Low\",\n  \"reason\": \"1 sentence\",\n  \"vmHook\": \"12-18 word personalized voicemail opening tailored to their specific business type and size\",\n  \"skipOutreach\": false\n}\n\nPriority rules:\n- High: small local business, few reviews, no/basic website, or owner number found directly\n- Medium: established local, decent presence\n- Low: multiple locations, clearly tech-forward\n- skipOutreach: true ONLY for obvious chains, franchises, or irrelevant categories\n\nFor vmHook, if owner name is known, start with their name. Keep it natural and specific to their trade."
             }
           ]
         },
@@ -359,7 +397,7 @@
       "name": "AI – Score & Personalize Lead",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1,
-      "position": [3100, 220],
+      "position": [3580, 220],
       "credentials": {
         "openAiApi": {
           "id": "openai-creds",
@@ -369,13 +407,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse AI response and merge with lead data\nconst lead = $('Loop Each Lead').first().json;\nconst aiRaw = $input.first().json;\n\nlet aiResult = {};\ntry {\n  // Extract JSON from AI text response\n  const text = aiRaw.content || aiRaw.text || JSON.stringify(aiRaw);\n  const match = text.match(/\\{[\\s\\S]*\\}/);\n  if (match) aiResult = JSON.parse(match[0]);\n} catch(e) {\n  aiResult = { priority: 'Medium', reason: 'Parse error', vmHook: '', skipOutreach: false };\n}\n\nreturn [{\n  json: {\n    ...lead,\n    aiPriority: aiResult.priority || 'Medium',\n    aiReason: aiResult.reason || '',\n    vmHook: aiResult.vmHook || '',\n    skipOutreach: aiResult.skipOutreach || false\n  }\n}];\n"
+        "jsCode": "// Parse AI response and merge with lead data\nconst lead = $('Loop Each Lead').first().json;\nconst aiRaw = $input.first().json;\n\nlet aiResult = {};\ntry {\n  const text = aiRaw.content || aiRaw.text || JSON.stringify(aiRaw);\n  const match = text.match(/\\{[\\s\\S]*\\}/);\n  if (match) aiResult = JSON.parse(match[0]);\n} catch(e) {\n  aiResult = { priority: 'Medium', reason: 'Parse error', vmHook: '', skipOutreach: false };\n}\n\nreturn [{\n  json: {\n    ...lead,\n    aiPriority: aiResult.priority || 'Medium',\n    aiReason: aiResult.reason || '',\n    vmHook: aiResult.vmHook || '',\n    skipOutreach: aiResult.skipOutreach || false\n  }\n}];\n"
       },
       "id": "a1b2c3d4-0014-0014-0014-a1b2c3d40014",
       "name": "Merge AI Score",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3340, 300]
+      "position": [3820, 300]
     },
     {
       "parameters": {
@@ -403,7 +441,7 @@
       "name": "Skip This Lead?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [3580, 300]
+      "position": [4060, 300]
     },
     {
       "parameters": {
@@ -411,14 +449,14 @@
         "url": "https://www.dropcowboy.com/api/send",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"token\": \"{{ $credentials.dropCowboyToken }}\",\n  \"phone\": \"{{ $json.Phone }}\",\n  \"callerid\": \"{{ $('Search Config').first().json.callerID }}\",\n  \"audio_url\": \"{{ $('Search Config').first().json.voicemailAudioURL }}\"\n}",
+        "jsonBody": "={\n  \"token\": \"YOUR_DROP_COWBOY_TOKEN\",\n  \"phone\": \"{{ $json.Phone }}\",\n  \"callerid\": \"{{ $('Search Config').first().json.callerID }}\",\n  \"audio_url\": \"{{ $('Search Config').first().json.voicemailAudioURL }}\"\n}",
         "options": {}
       },
       "id": "a1b2c3d4-0016-0016-0016-a1b2c3d40016",
       "name": "Drop Cowboy – Send Ringless VM",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3820, 220]
+      "position": [4300, 220]
     },
     {
       "parameters": {
@@ -429,7 +467,7 @@
       "name": "Rate Limit (2s)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [4060, 220],
+      "position": [4540, 220],
       "webhookId": "wait-webhook-ratelimit"
     },
     {
@@ -452,7 +490,7 @@
             "VM Sent": "Yes",
             "VM Date": "={{ new Date().toISOString().split('T')[0] }}",
             "Status": "Contacted",
-            "Notes": "=AI Priority: {{ $('Merge AI Score').first().json.aiPriority }} | {{ $('Merge AI Score').first().json.aiReason }}"
+            "Notes": "=AI Priority: {{ $('Merge AI Score').first().json.aiPriority }} | Phone Type: {{ $('Merge AI Score').first().json['Phone Type'] }} | {{ $('Merge AI Score').first().json.aiReason }}"
           }
         },
         "where": {
@@ -469,7 +507,7 @@
       "name": "Google Sheets – Mark VM Sent",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [4300, 220],
+      "position": [4780, 220],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-creds",
@@ -485,261 +523,134 @@
       "name": "Back to Loop",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [4540, 220]
+      "position": [5020, 220]
     },
     {
       "parameters": {
-        "content": "## 🚀 Business Outreach Agent\n\n**Flow:**\n1. Trigger → Set your niche + city in **Search Config**\n2. Apify scrapes Google Maps for local businesses\n3. Leads are cleaned, deduped, and saved to Google Sheets\n4. AI scores each lead (High/Med/Low) and personalizes the hook\n5. Drop Cowboy sends a ringless voicemail to each qualified lead\n6. Google Sheets is updated with VM status\n\n**Credentials Needed:**\n- Apify API Token\n- Google Sheets OAuth2\n- OpenAI API Key\n- Drop Cowboy API Token\n\n**Before Running:**\n- Replace `YOUR_GOOGLE_SHEET_ID` in all Sheet nodes\n- Replace `YOUR_10_DIGIT_PHONE_NUMBER` in Search Config\n- Upload your voicemail MP3 and add the public URL\n- Create the 'Leads' sheet with correct column headers (see README)",
-        "height": 400,
-        "width": 500,
+        "content": "## Business Outreach Agent v2\n\n**Flow:**\n1. Search Config → set niche, city, API keys\n2. Apify scrapes Google Maps (up to 50 businesses)\n3. Apollo.io looks up the OWNER's direct/mobile number\n4. Smart fallback: small biz (<30 reviews) = owner answers anyway\n5. Dedup against existing sheet rows\n6. AI scores lead and flags chains/franchises to skip\n7. Drop Cowboy sends ringless VM to the best available number\n8. Sheet updated with phone type, owner name, VM status\n\n**Credentials / Keys Needed:**\n- Apify API Token (replace in HTTP nodes)\n- Apollo.io API Key (add to Search Config)\n- Google Sheets OAuth2\n- OpenAI API Key\n- Drop Cowboy Token (replace in VM node)\n\n**Phone Type logic:**\n- Owner Mobile / Owner Direct → Apollo found their personal number\n- Owner-Operated (Business #) → <=30 reviews, owner answers\n- Business Line (Screened) → receptionist risk, stronger VM recommended",
+        "height": 460,
+        "width": 560,
         "color": 4
       },
       "id": "a1b2c3d4-0020-0020-0020-a1b2c3d40020",
       "name": "Setup Notes",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [200, 160]
+      "position": [200, 120]
     },
     {
       "parameters": {
-        "content": "## ⚠️ No New Leads\nAll scraped businesses already\nexist in the sheet.\n\nTry a different city or niche\nin the Search Config node.",
-        "height": 180,
-        "width": 280,
+        "content": "## Apollo Enrichment\nSearches Apollo.io for the business\nowner by name + title + location.\n\nFinds mobile/direct numbers when\navailable (~40-60% hit rate for\nsmall US businesses).\n\nFree tier: 50 exports/month\nBasic plan: $49/mo for 1,000/mo",
+        "height": 220,
+        "width": 300,
+        "color": 6
+      },
+      "id": "a1b2c3d4-0025-0025-0025-a1b2c3d40025",
+      "name": "Apollo Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1620, 140]
+    },
+    {
+      "parameters": {
+        "content": "## No New Leads\nAll scraped businesses already\nexist in your sheet.\n\nChange city or niche in\nSearch Config and re-run.",
+        "height": 160,
+        "width": 260,
         "color": 3
       },
       "id": "a1b2c3d4-0021-0021-0021-a1b2c3d40021",
       "name": "No New Leads Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [2380, 500]
+      "position": [2860, 520]
     },
     {
       "parameters": {
-        "content": "## 🤖 AI Scoring\nGPT-4o-mini analyzes each lead:\n- Assigns High/Med/Low priority\n- Generates a personalized VM hook\n- Flags chains/franchises to skip\n\nSwap for Claude if preferred.",
+        "content": "## AI Scoring\nGPT-4o-mini scores each lead and:\n- Uses owner name if Apollo found it\n- Adjusts hook based on phone type\n  (owner direct vs screened line)\n- Flags chains/franchises to skip\n- Generates personalized VM hook",
         "height": 180,
         "width": 300,
-        "color": 6
+        "color": 7
       },
       "id": "a1b2c3d4-0022-0022-0022-a1b2c3d40022",
       "name": "AI Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [3060, 60]
+      "position": [3540, 60]
     }
   ],
   "pinData": {},
   "connections": {
     "Start (Manual Trigger)": {
-      "main": [
-        [
-          {
-            "node": "Search Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Search Config", "type": "main", "index": 0 }]]
     },
     "Search Config": {
-      "main": [
-        [
-          {
-            "node": "Apify – Start Scrape Run",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Apify – Start Scrape Run", "type": "main", "index": 0 }]]
     },
     "Apify – Start Scrape Run": {
-      "main": [
-        [
-          {
-            "node": "Wait 3 Min (Apify Runs)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Wait 3 Min (Apify Runs)", "type": "main", "index": 0 }]]
     },
     "Wait 3 Min (Apify Runs)": {
-      "main": [
-        [
-          {
-            "node": "Apify – Fetch Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Apify – Fetch Results", "type": "main", "index": 0 }]]
     },
     "Apify – Fetch Results": {
-      "main": [
-        [
-          {
-            "node": "Process & Clean Leads",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Process & Clean Leads", "type": "main", "index": 0 }]]
     },
     "Process & Clean Leads": {
-      "main": [
-        [
-          {
-            "node": "Google Sheets – Read Existing",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Apollo – Find Owner", "type": "main", "index": 0 }]]
+    },
+    "Apollo – Find Owner": {
+      "main": [[{ "node": "Merge Owner Data", "type": "main", "index": 0 }]]
+    },
+    "Merge Owner Data": {
+      "main": [[{ "node": "Google Sheets – Read Existing", "type": "main", "index": 0 }]]
     },
     "Google Sheets – Read Existing": {
-      "main": [
-        [
-          {
-            "node": "Filter Duplicates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Filter Duplicates", "type": "main", "index": 0 }]]
     },
     "Filter Duplicates": {
-      "main": [
-        [
-          {
-            "node": "Any New Leads?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Any New Leads?", "type": "main", "index": 0 }]]
     },
     "Any New Leads?": {
       "main": [
-        [
-          {
-            "node": "Google Sheets – Add New Leads",
-            "type": "main",
-            "index": 0
-          }
-        ],
+        [{ "node": "Google Sheets – Add New Leads", "type": "main", "index": 0 }],
         []
       ]
     },
     "Google Sheets – Add New Leads": {
-      "main": [
-        [
-          {
-            "node": "Google Sheets – Get Uncontacted",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Google Sheets – Get Uncontacted", "type": "main", "index": 0 }]]
     },
     "Google Sheets – Get Uncontacted": {
-      "main": [
-        [
-          {
-            "node": "Loop Each Lead",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Loop Each Lead", "type": "main", "index": 0 }]]
     },
     "Loop Each Lead": {
       "main": [
-        [
-          {
-            "node": "AI – Score & Personalize Lead",
-            "type": "main",
-            "index": 0
-          }
-        ],
+        [{ "node": "AI – Score & Personalize Lead", "type": "main", "index": 0 }],
         []
       ]
     },
     "AI – Score & Personalize Lead": {
-      "main": [
-        [
-          {
-            "node": "Merge AI Score",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Merge AI Score", "type": "main", "index": 0 }]]
     },
     "Merge AI Score": {
-      "main": [
-        [
-          {
-            "node": "Skip This Lead?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Skip This Lead?", "type": "main", "index": 0 }]]
     },
     "Skip This Lead?": {
       "main": [
         [],
-        [
-          {
-            "node": "Drop Cowboy – Send Ringless VM",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Drop Cowboy – Send Ringless VM", "type": "main", "index": 0 }]
       ]
     },
     "Drop Cowboy – Send Ringless VM": {
-      "main": [
-        [
-          {
-            "node": "Rate Limit (2s)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Rate Limit (2s)", "type": "main", "index": 0 }]]
     },
     "Rate Limit (2s)": {
-      "main": [
-        [
-          {
-            "node": "Google Sheets – Mark VM Sent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Google Sheets – Mark VM Sent", "type": "main", "index": 0 }]]
     },
     "Google Sheets – Mark VM Sent": {
-      "main": [
-        [
-          {
-            "node": "Back to Loop",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Back to Loop", "type": "main", "index": 0 }]]
     },
     "Back to Loop": {
-      "main": [
-        [
-          {
-            "node": "Loop Each Lead",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Loop Each Lead", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
@@ -753,7 +664,7 @@
     "templateCredsSetupCompleted": false,
     "instanceId": "YOUR_N8N_INSTANCE_ID"
   },
-  "id": "business-outreach-agent-v1",
+  "id": "business-outreach-agent-v2",
   "tags": [
     {
       "createdAt": "2026-03-14T00:00:00.000Z",

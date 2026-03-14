@@ -87,27 +87,36 @@ Loop back → next lead
 
 Create a new Google Sheet and name the first tab **Leads**.
 
-Add these exact column headers in row 1 (A through Q):
+Add these exact column headers in row 1 (A through S):
 
 ```
 A: Business Name
 B: Owner Name
 C: Phone
-D: Formatted Phone
-E: Address
-F: City
-G: State
-H: Website
-I: Rating
-J: Review Count
-K: Category
-L: Google Maps URL
-M: Date Added
-N: VM Sent
-O: VM Date
-P: Status
-Q: Notes
+D: Phone Type
+E: Owner Mobile (Apollo)
+F: Business Phone
+G: Address
+H: City
+I: State
+J: Website
+K: Rating
+L: Review Count
+M: Category
+N: Google Maps URL
+O: Date Added
+P: VM Sent
+Q: VM Date
+R: Status
+S: Notes
 ```
+
+**Phone Type** values the workflow will fill in automatically:
+- `Owner Mobile` — Apollo found their personal cell (best)
+- `Owner Direct` — Apollo found a direct line (great)
+- `Apollo Found` — Apollo found a number, type unclear
+- `Owner-Operated (Business #)` — under 30 reviews, owner likely answers themselves
+- `Business Line (Screened)` — larger business, receptionist risk
 
 Copy the Sheet ID from the URL:
 `https://docs.google.com/spreadsheets/d/THIS_IS_THE_ID/edit`
@@ -133,12 +142,6 @@ Record a short voicemail (20–30 seconds). See `voicemail-scripts.md` for prove
 
 In n8n, go to **Credentials** and create:
 
-**Apify API Token**
-- Type: `HTTP Query Auth`
-- Name: `Apify API Token`
-- Query parameter name: `token`
-- Value: Your Apify API token from [apify.com/account/integrations](https://console.apify.com/account/integrations)
-
 **Google Sheets OAuth2**
 - Type: `Google Sheets OAuth2 API`
 - Follow the OAuth flow to connect your Google account
@@ -147,8 +150,17 @@ In n8n, go to **Credentials** and create:
 - Type: `OpenAI API`
 - API Key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
+**Apify API Token**
+- Paste directly into the two Apify HTTP Request nodes (replace `YOUR_APIFY_API_TOKEN`)
+- Get it from [console.apify.com/account/integrations](https://console.apify.com/account/integrations)
+
+**Apollo.io API Key**
+- Add to the `Search Config` node in the `apolloApiKey` field
+- Get it from [developer.apollo.io](https://developer.apollo.io) → API Keys
+- Free tier: 50 enrichments/month | Basic ($49/mo): 1,000/month
+
 **Drop Cowboy Token**
-- You'll add this directly inside the HTTP Request node (not as a saved credential)
+- Paste directly into the `Drop Cowboy – Send Ringless VM` HTTP Request node body
 - Get your token from your Drop Cowboy account settings
 
 ### 5. Configure the Search Config Node
@@ -175,6 +187,12 @@ Nodes to update:
 - `Google Sheets – Add New Leads`
 - `Google Sheets – Get Uncontacted`
 - `Google Sheets – Mark VM Sent`
+
+### 7. Update API Tokens in HTTP Request Nodes
+
+Replace these placeholder strings directly in the node bodies/params:
+- `YOUR_APIFY_API_TOKEN` — in both Apify HTTP Request nodes
+- `YOUR_DROP_COWBOY_TOKEN` — in the Drop Cowboy VM node
 
 ### 7. Test Run
 
