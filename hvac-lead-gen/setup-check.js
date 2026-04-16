@@ -5,16 +5,16 @@
 //
 // Checks:
 //   ✓ .env file is loaded and required vars are present
-//   ✓ Apollo.io API key is valid and can perform searches
+//   ✓ Apify API token is valid and the scraper actor exists
 //   ✓ Google service account credentials are readable
 //   ✓ Google Sheets spreadsheet is accessible
 // ─────────────────────────────────────────────────────────────────────────────
 
 require('dotenv').config();
 
-const { testConnection: apolloTest  } = require('./apollo');
-const { testConnection: sheetsTest  } = require('./sheets');
-const config                          = require('./config');
+const { testConnection: apifyTest  } = require('./apify');
+const { testConnection: sheetsTest } = require('./sheets');
+const config                         = require('./config');
 
 const PASS = '  ✓';
 const FAIL = '  ✗';
@@ -34,8 +34,8 @@ async function main() {
   console.log('[ 1 ] Environment Variables');
 
   const checks = [
-    { key: 'APOLLO_API_KEY',                   label: 'APOLLO_API_KEY'                   },
-    { key: 'GOOGLE_SPREADSHEET_ID',            label: 'GOOGLE_SPREADSHEET_ID'            },
+    { key: 'APIFY_API_TOKEN',       label: 'APIFY_API_TOKEN'       },
+    { key: 'GOOGLE_SPREADSHEET_ID', label: 'GOOGLE_SPREADSHEET_ID' },
     {
       key  : '_GOOGLE_CREDS',
       label: 'Google credentials (KEY_FILE or JSON)',
@@ -46,7 +46,7 @@ async function main() {
   for (const c of checks) {
     const val = c.value !== undefined ? c.value : process.env[c.key];
     if (val) {
-      const preview = val.length > 40 ? val.slice(0, 40) + '…' : val;
+      const preview = val.length > 50 ? val.slice(0, 50) + '…' : val;
       console.log(`${PASS} ${c.label}: ${preview}`);
     } else {
       console.log(`${FAIL} ${c.label} is NOT set`);
@@ -54,25 +54,24 @@ async function main() {
     }
   }
 
-  // Optional: notification email
   if (config.notificationEmail) {
     console.log(`${PASS} NOTIFICATION_EMAIL: ${config.notificationEmail}`);
   } else {
-    console.log(`${WARN} NOTIFICATION_EMAIL not set (error alerts will only go to console)`);
+    console.log(`${WARN} NOTIFICATION_EMAIL not set (errors will only appear in console)`);
   }
 
   console.log('');
 
-  // ── 2. Apollo.io connection ────────────────────────────────────────────────
+  // ── 2. Apify connection ────────────────────────────────────────────────────
 
-  console.log('[ 2 ] Apollo.io API');
+  console.log('[ 2 ] Apify (Google Maps Scraper)');
 
-  if (!process.env.APOLLO_API_KEY) {
-    console.log(`${FAIL} Skipped — APOLLO_API_KEY not set`);
+  if (!process.env.APIFY_API_TOKEN) {
+    console.log(`${FAIL} Skipped — APIFY_API_TOKEN not set`);
     allPassed = false;
   } else {
     process.stdout.write('  Connecting…');
-    const result = await apolloTest();
+    const result = await apifyTest();
     if (result.ok) {
       console.log(`\r${PASS} ${result.message}`);
     } else {
@@ -85,7 +84,7 @@ async function main() {
 
   // ── 3. Google Sheets connection ────────────────────────────────────────────
 
-  console.log('[ 3 ] Google Sheets API');
+  console.log('[ 3 ] Google Sheets');
 
   const hasCredentials =
     process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ||
@@ -110,12 +109,12 @@ async function main() {
   // ── 4. Config summary ──────────────────────────────────────────────────────
 
   console.log('[ 4 ] Workflow Configuration');
-  console.log(`${PASS} Cities to search    : ${config.cities.length} (${config.cities.map((c) => c.split(',')[0]).join(', ')})`);
-  console.log(`${PASS} Industries          : ${config.industries.join(', ')}`);
-  console.log(`${PASS} Job titles          : ${config.jobTitles.join(', ')}`);
-  console.log(`${PASS} Employee range      : ${config.employeeRange}`);
-  console.log(`${PASS} Max leads per run   : ${config.maxLeadsPerRun}`);
+  console.log(`${PASS} Cities targeted     : ${config.cities.length} (${config.cities.join(', ')})`);
+  console.log(`${PASS} Search term         : "${config.primarySearchTerm}"`);
+  console.log(`${PASS} Max places/city     : ${config.maxPlacesPerCity}`);
+  console.log(`${PASS} Max leads/run       : ${config.maxLeadsPerRun}`);
   console.log(`${PASS} Spreadsheet tab     : "${config.sheetName}"`);
+  console.log(`${PASS} Spreadsheet ID      : ${config.spreadsheetId}`);
   console.log(`${PASS} Schedule            : ${process.env.CRON_SCHEDULE || '0 7 * * *'} (America/New_York)`);
 
   console.log('');
@@ -127,8 +126,8 @@ async function main() {
     console.log('  ALL CHECKS PASSED — You are ready to go!');
     console.log('');
     console.log('  Next steps:');
-    console.log('    npm run run-once   ← Run one batch right now (test mode)');
-    console.log('    npm start          ← Start the daily 7 AM scheduler');
+    console.log('    npm run run-once   ← Run one batch right now (writes to your sheet)');
+    console.log('    npm start          ← Start the daily 7 AM Eastern scheduler');
     console.log('════════════════════════════════════════════════════════════════');
     console.log('');
   } else {
@@ -144,32 +143,29 @@ async function main() {
 }
 
 function printHelp() {
-  console.log('  ── How to get your API keys ──────────────────────────────');
+  console.log('  ── How to get your credentials ──────────────────────────────');
   console.log('');
-  console.log('  APOLLO_API_KEY');
-  console.log('    1. Log in to Apollo.io');
-  console.log('    2. Go to Settings → Integrations → API');
-  console.log('    3. Copy your API key');
+  console.log('  APIFY_API_TOKEN');
+  console.log('    1. Log in at apify.com');
+  console.log('    2. Go to Settings → Integrations');
+  console.log('    3. Copy your Personal API token');
+  console.log('    Free tier gives $5/month compute credit — more than enough.');
   console.log('');
-  console.log('  GOOGLE_SERVICE_ACCOUNT_KEY_FILE (Google Sheets access)');
+  console.log('  GOOGLE_SERVICE_ACCOUNT_KEY_FILE (for Google Sheets access)');
   console.log('    1. Go to console.cloud.google.com');
-  console.log('    2. Create a project (or use existing)');
-  console.log('    3. Enable the Google Sheets API');
-  console.log('    4. Go to IAM → Service Accounts → Create Service Account');
-  console.log('    5. Create a JSON key and download it');
-  console.log('    6. Save the file as credentials/service-account.json');
-  console.log('    7. IMPORTANT: Open your Google Sheet → Share → paste the');
-  console.log('       service account email (ends in @...iam.gserviceaccount.com)');
-  console.log('       Give it "Editor" access');
+  console.log('    2. Enable the Google Sheets API for your project');
+  console.log('    3. IAM → Service Accounts → Create → download JSON key');
+  console.log('    4. Save as: hvac-lead-gen/credentials/service-account.json');
+  console.log('    5. Open your Google Sheet → Share → paste the service account');
+  console.log('       email (ends in @...iam.gserviceaccount.com) → Editor access');
   console.log('');
   console.log('  GOOGLE_SPREADSHEET_ID');
-  console.log('    From the spreadsheet URL:');
+  console.log('    From your sheet URL:');
   console.log('    https://docs.google.com/spreadsheets/d/YOUR_ID_HERE/edit');
   console.log('');
 }
 
 main().catch((err) => {
   console.error('\n[Setup Check] Unexpected error:', err.message);
-  console.error(err.stack);
   process.exit(1);
 });

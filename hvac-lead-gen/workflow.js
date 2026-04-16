@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // workflow.js — Core lead generation logic
-// Orchestrates: Apollo search → deduplication → Google Sheets write.
+// Orchestrates: Apify scrape → deduplication → Google Sheets write.
 // Called by the cron scheduler in index.js or directly via `npm run run-once`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { searchLeads }                                          = require('./apollo');
+const { searchLeads }                                          = require('./apify');
 const { getExistingBusinessNames, appendLeads, ensureHeaders } = require('./sheets');
 const config                                                   = require('./config');
 
@@ -14,7 +14,7 @@ const DIVIDER = '─'.repeat(60);
  * Run one complete lead generation cycle:
  *   1. Ensure the sheet has headers
  *   2. Load existing business names (dedup key)
- *   3. Search Apollo for new HVAC leads
+ *   3. Scrape Google Maps via Apify for new HVAC leads
  *   4. Filter out already-seen businesses
  *   5. Write up to maxLeadsPerRun new rows to Google Sheets
  *
@@ -22,13 +22,13 @@ const DIVIDER = '─'.repeat(60);
  */
 async function runWorkflow() {
   const runTime = new Date().toLocaleString('en-US', {
-    weekday  : 'long',
-    month    : 'short',
-    day      : 'numeric',
-    year     : 'numeric',
-    hour     : 'numeric',
-    minute   : '2-digit',
-    timeZone : 'America/New_York',
+    weekday : 'long',
+    month   : 'short',
+    day     : 'numeric',
+    year    : 'numeric',
+    hour    : 'numeric',
+    minute  : '2-digit',
+    timeZone: 'America/New_York',
   });
 
   console.log(`\n${DIVIDER}`);
@@ -36,26 +36,27 @@ async function runWorkflow() {
   console.log(DIVIDER);
 
   try {
-    // ── Step 1: Headers ─────────────────────────────────────────────────────
+    // ── Step 1: Headers ──────────────────────────────────────────────────────
     console.log('[Workflow] Step 1/4 — Checking Google Sheet headers...');
     await ensureHeaders();
 
-    // ── Step 2: Load existing business names for dedup ───────────────────────
+    // ── Step 2: Load existing names for dedup ────────────────────────────────
     console.log('[Workflow] Step 2/4 — Loading existing leads for deduplication...');
     const existingNames = await getExistingBusinessNames();
     console.log(`  ${existingNames.size} businesses already in the sheet`);
 
-    // ── Step 3: Search Apollo ────────────────────────────────────────────────
-    console.log(`[Workflow] Step 3/4 — Searching Apollo.io (max ${config.maxLeadsPerRun} leads)...`);
+    // ── Step 3: Scrape via Apify ─────────────────────────────────────────────
+    console.log(`[Workflow] Step 3/4 — Scraping Google Maps via Apify (target: ${config.maxLeadsPerRun} leads)...`);
     const rawLeads = await searchLeads();
-    console.log(`  Apollo returned ${rawLeads.length} valid leads across all cities`);
+    console.log(`  Apify returned ${rawLeads.length} valid leads after filtering`);
 
     if (rawLeads.length === 0) {
       const msg =
-        '[Workflow] Apollo returned 0 leads. Possible causes:\n' +
-        '  • Monthly API quota exhausted (check your Apollo plan)\n' +
-        '  • Filters are too narrow — try broadening city list or industries\n' +
-        '  • APOLLO_API_KEY is valid but lacks search permissions';
+        '[Workflow] Apify returned 0 usable leads. Possible causes:\n' +
+        '  • No HVAC businesses found matching the relevance filter\n' +
+        '  • All results had no phone number\n' +
+        '  • Apify run failed — check your dashboard at apify.com\n' +
+        '  • APIFY_API_TOKEN may be invalid or have no remaining credit';
       console.warn(msg);
       notifyError(msg);
       return;
@@ -79,7 +80,6 @@ async function runWorkflow() {
       return;
     }
 
-    // Respect the per-run cap
     const toWrite = newLeads.slice(0, config.maxLeadsPerRun);
     const written = await appendLeads(toWrite);
 
@@ -88,7 +88,7 @@ async function runWorkflow() {
     console.log(`[Workflow] DONE — ${written} new lead(s) added to the sheet`);
     if (newLeads.length > toWrite.length) {
       const leftOver = newLeads.length - toWrite.length;
-      console.log(`  (${leftOver} additional lead(s) held back due to maxLeadsPerRun=${config.maxLeadsPerRun} limit)`);
+      console.log(`  (${leftOver} additional leads held back by maxLeadsPerRun=${config.maxLeadsPerRun} cap)`);
     }
     console.log(DIVIDER + '\n');
 
@@ -104,8 +104,8 @@ async function runWorkflow() {
  *
  * To enable real email alerts:
  *   1. npm install nodemailer
- *   2. Add SMTP env vars to .env (see commented example below)
- *   3. Uncomment the nodemailer block
+ *   2. Add SMTP env vars to .env (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
+ *   3. Uncomment the nodemailer block below
  *
  * @param {string} message - Human-readable error description
  */
@@ -124,7 +124,6 @@ function notifyError(message) {
 
     // ── Uncomment to enable SMTP email alerts ──────────────────────────────
     // Requires: npm install nodemailer
-    // Add to .env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
     //
     // const nodemailer = require('nodemailer');
     // const transporter = nodemailer.createTransport({

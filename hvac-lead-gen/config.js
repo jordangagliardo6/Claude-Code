@@ -1,72 +1,57 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // config.js — All tunable parameters in one place.
-// Modify cities, industries, job titles, or column structure here.
+// Modify cities, search terms, limits, or column structure here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
 
-  // ── Target locations ───────────────────────────────────────────────────────
-  // Apollo uses "City, State, Country" format.
-  // Add or remove cities freely — the workflow cycles through each one.
+  // ── Target cities ──────────────────────────────────────────────────────────
+  // These are appended to primarySearchTerm to build each Google Maps query.
+  // Add or remove cities freely — they all run in a single Apify scrape job.
   cities: [
-    'St. Joseph, Michigan, United States',
-    'Benton Harbor, Michigan, United States',
-    'Kalamazoo, Michigan, United States',
-    'Holland, Michigan, United States',
-    'Grand Haven, Michigan, United States',
-    'Muskegon, Michigan, United States',
-    'South Haven, Michigan, United States',
+    'St Joseph MI',
+    'Benton Harbor MI',
+    'Kalamazoo MI',
+    'Holland MI',
+    'Grand Haven MI',
+    'Muskegon MI',
+    'South Haven MI',
   ],
 
-  // ── Industry keywords ──────────────────────────────────────────────────────
-  // Apollo matches these against organization descriptions and tags.
-  industries: [
-    'hvac',
-    'heating and air conditioning',
-    'plumbing',
-    'mechanical contracting',
-  ],
+  // ── Search term ────────────────────────────────────────────────────────────
+  // Combined with each city to form Google Maps search queries.
+  // e.g. "HVAC heating air conditioning contractor Kalamazoo MI"
+  // Change this to target a different industry without touching anything else.
+  primarySearchTerm: 'HVAC heating air conditioning plumbing contractor',
 
-  // ── Decision-maker job titles (priority order) ────────────────────────────
-  // Apollo will return people whose titles contain any of these strings.
-  jobTitles: [
-    'owner',
-    'president',
-    'founder',
-    'co-founder',
-    'general manager',
-  ],
-
-  // ── Company size filter ────────────────────────────────────────────────────
-  // "1,25" means 1–25 employees (owner-operated small businesses only).
-  employeeRange: '1,25',
+  // ── Per-city result cap ────────────────────────────────────────────────────
+  // Max places Apify will scrape per city per run.
+  // 5 cities × 5 places = up to 35 raw results before filtering.
+  // Increase if you're consistently getting fewer than 25 usable leads.
+  maxPlacesPerCity: 5,
 
   // ── Run limits ─────────────────────────────────────────────────────────────
-  // Maximum new leads to add per scheduled run. Keeps the list manageable.
+  // Maximum new leads added to the sheet per scheduled run.
   maxLeadsPerRun: 25,
 
   // ── Google Sheets ──────────────────────────────────────────────────────────
-  // Spreadsheet ID is read from the GOOGLE_SPREADSHEET_ID env var.
   spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+  sheetName    : 'Sheet1',
 
-  // Name of the tab/sheet within the spreadsheet.
-  sheetName: 'Leads',
-
-  // Column headers written to row 1 on first run (if the sheet is empty).
-  // IMPORTANT: These must stay in sync with the row-building logic in sheets.js.
+  // Column headers — written to row 1 on the very first run if the sheet is empty.
+  // IMPORTANT: if you reorder these, also update the row array in sheets.js → appendLeads().
   columns: [
     'Date Added',       // A
     'Business Name',    // B  ← deduplication key
-    'Owner First Name', // C
-    'Owner Last Name',  // D
+    'Owner First Name', // C  (leave blank — fill in when you call)
+    'Owner Last Name',  // D  (leave blank — fill in when you call)
     'Phone Number',     // E
     'City',             // F
     'Website',          // G
-    'Called',           // H — left blank for you to fill in
-    'Notes',            // I — left blank for you to fill in
+    'Called',           // H  (leave blank for manual tracking)
+    'Notes',            // I  (leave blank for manual notes)
   ],
 
   // ── Notifications ──────────────────────────────────────────────────────────
-  // Used by workflow.js notifyError(). Set in .env or leave blank to skip.
   notificationEmail: process.env.NOTIFICATION_EMAIL || '',
 };
