@@ -1,0 +1,9 @@
+node_modules/
+
+# Never commit real credentials
+.env
+credentials.json
+
+# Log files are local artifacts
+logs/
+*.log
