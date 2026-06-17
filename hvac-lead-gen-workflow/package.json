@@ -1,0 +1,20 @@
+{
+  "name": "hvac-lead-gen-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily Apollo.io -> Google Sheets lead generation workflow for Southwest Michigan HVAC/plumbing/mechanical contractors.",
+  "main": "src/run.js",
+  "scripts": {
+    "authorize": "node src/authorize.js",
+    "test-connections": "node src/testConnections.js",
+    "run-once": "node src/run.js",
+    "start": "node src/scheduler.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "googleapis": "^140.0.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.15"
+  }
+}
