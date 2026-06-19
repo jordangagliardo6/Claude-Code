@@ -1,0 +1,20 @@
+{
+  "name": "apollo-hvac-lead-gen",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily Apollo.io -> Google Sheets lead-gen workflow for Southwest Michigan HVAC/plumbing/mechanical contractors.",
+  "main": "scheduler.js",
+  "scripts": {
+    "start": "node scheduler.js",
+    "run-once": "node scripts/run-once.js",
+    "test-connections": "node scripts/test-connections.js",
+    "setup-google-auth": "node scripts/setup-google-auth.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "googleapis": "^140.0.1",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^9.0.1"
+  }
+}
