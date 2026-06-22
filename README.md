@@ -4,6 +4,11 @@ An automated lead generation and ringless voicemail outreach system built on n8n
 It scrapes local business phone numbers via Apify, scores leads with AI, logs everything
 to Google Sheets, and drops a ringless voicemail on each qualified prospect.
 
+> Looking for a lighter-weight, standalone Node.js alternative? See
+> [`apollo-leadgen/`](./apollo-leadgen) -- an Apollo.io + Google Sheets daily
+> lead-gen script (no n8n required) targeting Southwest Michigan HVAC,
+> plumbing, and mechanical contractors.
+
 ---
 
 ## How It Works (Full Flow)
