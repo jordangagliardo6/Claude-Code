@@ -1,0 +1,21 @@
+{
+  "name": "hvac-lead-gen",
+  "version": "1.0.0",
+  "description": "Automated HVAC lead generation for SW Michigan — Apollo.io + Google Sheets, daily at 7am ET",
+  "main": "leadgen.js",
+  "scripts": {
+    "start": "node leadgen.js",
+    "run-now": "node leadgen.js --run-now",
+    "test-connection": "node test-connection.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "googleapis": "^137.1.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.13"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
