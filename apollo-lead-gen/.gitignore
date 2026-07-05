@@ -1,0 +1,7 @@
+node_modules/
+.env
+error.log
+
+# Google OAuth credentials — never commit these
+credentials/credentials.json
+credentials/token.json
