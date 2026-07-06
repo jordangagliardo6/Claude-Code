@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit these
+.env
+google-credentials.json
+*-credentials.json
+*.key.json
+
+# Logs
+*.log
+lead-gen.log
+
+# macOS / editor
+.DS_Store
+.vscode/

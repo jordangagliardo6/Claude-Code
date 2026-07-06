@@ -1,3 +1,184 @@
+# HVAC Lead Generation — Apollo.io → Google Sheets (Node.js)
+
+An automated daily lead pipeline that searches Apollo.io for HVAC/Plumbing owners in
+Southwest Michigan, deduplicates against your existing sheet, and appends up to 25 new
+rows every morning at 7 AM Eastern Time.
+
+---
+
+## Quick Start
+
+```
+git clone <this-repo>
+cd <this-repo>
+cp .env.example .env          # fill in your API keys (see Setup below)
+npm install
+npm run test-connection       # verify both APIs work before first run
+RUN_NOW=true npm start        # run one cycle immediately, then keep scheduling
+```
+
+---
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `index.js` | Scheduler + orchestrator (entry point) |
+| `test-connection.js` | One-time connectivity test — run before first scheduled run |
+| `src/apollo.js` | Apollo.io People Search API wrapper |
+| `src/sheets.js` | Google Sheets read / append via service account |
+| `src/mailer.js` | Optional email alerts on failure |
+| `.env.example` | Template for environment variables |
+
+---
+
+## Setup
+
+### 1. Apollo.io API Key
+
+1. Log in to [apollo.io](https://app.apollo.io)
+2. Go to **Settings → Integrations → API**
+3. Copy your API key
+4. Set `APOLLO_API_KEY=...` in your `.env`
+
+> **Plan note:** The People Search endpoint is available on all plans. Phone numbers
+> are returned when available in Apollo's database — free tier may show fewer phones.
+> For maximum phone coverage, a Basic plan ($49/mo) is recommended.
+
+---
+
+### 2. Google Sheets Service Account
+
+A service account lets the script write to your sheet without browser OAuth prompts —
+essential for a cron job that runs while you sleep.
+
+**Step 1 — Create a Google Cloud project (skip if you have one)**
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Click the project picker → **New Project** → give it a name → Create
+
+**Step 2 — Enable the Sheets API**
+
+1. In your project: **APIs & Services → Enable APIs and Services**
+2. Search for **Google Sheets API** → Enable
+
+**Step 3 — Create a service account**
+
+1. **IAM & Admin → Service Accounts → Create Service Account**
+2. Name it (e.g. `hvac-lead-gen`) — no project roles needed → Done
+3. Click the account you just created → **Keys** tab
+4. **Add Key → Create New Key → JSON** → download saves as `...json`
+5. Rename/move it to the project root as `google-credentials.json`
+
+**Step 4 — Share your spreadsheet**
+
+1. Open (or create) the Google Sheet you want to write to
+2. Click **Share** → paste in the service account email from the JSON file
+   (it looks like `hvac-lead-gen@your-project.iam.gserviceaccount.com`)
+3. Give it **Editor** access → Send
+4. Copy the spreadsheet ID from the URL and set `GOOGLE_SPREADSHEET_ID=...` in `.env`
+
+**Sheet structure (columns A–I):**
+
+| A | B | C | D | E | F | G | H | I |
+|---|---|---|---|---|---|---|---|---|
+| Date Added | Business Name | Owner First Name | Owner Last Name | Phone Number | City | Website | Called | Notes |
+
+The script creates the header row automatically on first run if the sheet is empty.
+
+---
+
+### 3. Email Alerts (optional)
+
+To receive an email when a run fails:
+
+1. Create a Gmail App Password:
+   - [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   - Select **Mail** + **Other** → generate → copy the 16-character password
+2. Set in `.env`:
+   ```
+   ALERT_EMAIL=jgagliardo98@gmail.com
+   SMTP_USER=your_gmail@gmail.com
+   SMTP_PASS=xxxx xxxx xxxx xxxx   # 16-char app password, spaces OK
+   ```
+
+---
+
+### 4. First-Run Verification
+
+After filling in `.env`, run the connection test:
+
+```bash
+npm run test-connection
+```
+
+Expected output:
+```
+  ✓ API key found (abc12345...)
+  ✓ Apollo.io connected — test search returned 47 total available results
+  ✓ Service account: hvac-lead-gen@your-project.iam.gserviceaccount.com
+  ✓ Spreadsheet accessible — 0 existing lead(s) found
+  ✓ Sheet tab: "Leads"
+
+  Apollo.io:      CONNECTED ✓
+  Google Sheets:  CONNECTED ✓
+  Email Alerts:   CONFIGURED ✓
+```
+
+If either check fails, the script prints what to fix before exiting.
+
+---
+
+### 5. Running the Scheduler
+
+```bash
+# Start — stays running, fires at 7 AM ET every day
+npm start
+
+# Run one cycle right now AND keep the daily schedule
+RUN_NOW=true npm start
+
+# Run a single cycle and exit (useful for manual tests)
+node -e "require('dotenv').config(); require('./src/apollo').searchLeads().then(r => console.log(r.leads.length + ' leads found'))"
+```
+
+**To run as a background process on Linux/Mac:**
+```bash
+nohup npm start >> lead-gen.log 2>&1 &
+```
+
+---
+
+## Customising the Search
+
+All the easy-to-change settings live at the top of each source file:
+
+| What to change | File | Variable |
+|---|---|---|
+| Cities / geography | `src/apollo.js` | `TARGET_CITIES` |
+| Industry keywords | `src/apollo.js` | `INDUSTRY_KEYWORDS` |
+| Job title priority | `src/apollo.js` | `TITLE_PRIORITY` |
+| Max leads per run | `index.js` | `MAX_LEADS_PER_RUN` |
+| Sheet column order | `src/sheets.js` | `HEADERS` |
+| Cron schedule | `index.js` | `CRON_SCHEDULE` |
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Apollo returns 0 results | API key wrong / plan limit | Check `APOLLO_API_KEY`, try a broader keyword |
+| Apollo returns 401/403 | Invalid key | Regenerate key at apollo.io → Settings → API |
+| Sheets returns 404 | Wrong spreadsheet ID | Re-copy the ID from the URL |
+| Sheets returns 403 | Service account not shared | Share the sheet with the service account email (Editor) |
+| Phone numbers missing | Apollo's database coverage | Normal — Apollo's phone data varies; enrichment credits improve yield |
+| "Cannot find module" errors | Dependencies not installed | Run `npm install` |
+
+---
+
+---
+
 # n8n Business Outreach Agent
 
 An automated lead generation and ringless voicemail outreach system built on n8n.
