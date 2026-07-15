@@ -1,0 +1,12 @@
+# Environment — never commit real API keys
+.env
+
+# Google OAuth tokens and credentials — keep these private
+credentials/token.json
+credentials/credentials.json
+
+# Runtime log
+error.log
+
+# Node dependencies
+node_modules/
