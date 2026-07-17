@@ -1,4 +1,134 @@
-# n8n Business Outreach Agent
+# Business Outreach Automation Suite
+
+Two complementary tools for automated lead generation and HVAC outreach in Southwest Michigan.
+
+---
+
+## Tool 1 — HVAC Lead Gen (Apollo.io + Google Sheets)
+
+**Directory:** `lead-gen/`
+
+A lightweight Node.js script that runs every morning at 7am ET, pulls up to 25 HVAC owner/decision-maker contacts from Apollo.io, and appends them to a Google Sheets spreadsheet — skipping any business already in the sheet.
+
+### Quick Start
+
+```bash
+cd lead-gen
+npm install
+
+# First-time Google auth (run once)
+npm run auth
+
+# Verify both APIs are connected
+npm run setup
+
+# Test run immediately, then stay up for the daily cron
+node index.js --now
+
+# Production — daily cron only (use pm2 / systemd to keep alive)
+node index.js
+```
+
+### Prerequisites
+
+| What | Where to get it |
+|---|---|
+| Apollo.io API key | [developer.apollo.io](https://developer.apollo.io) → API Keys (Basic plan or higher recommended) |
+| Google Cloud project | [console.cloud.google.com](https://console.cloud.google.com) |
+| Google Sheets API enabled | Cloud Console → APIs & Services → Enable APIs → "Google Sheets API" |
+| OAuth2 credentials (Desktop app) | Cloud Console → APIs & Services → Credentials → Create OAuth 2.0 Client ID |
+
+### Step-by-Step First Run
+
+**1. Create your Google Sheet**
+
+Create a new Google Sheet with a tab named **Leads** (or whatever you set `GOOGLE_SHEET_TAB` to). The workflow writes the header row automatically on the first run if the sheet is empty — no manual column setup required.
+
+Copy the Sheet ID from the URL:
+```
+https://docs.google.com/spreadsheets/d/THIS_IS_YOUR_ID/edit
+```
+
+**2. Set up environment variables**
+
+```bash
+cd lead-gen
+cp .env.example .env
+# Edit .env and fill in APOLLO_API_KEY and GOOGLE_SPREADSHEET_ID
+```
+
+**3. Get Google credentials**
+
+- Go to [console.cloud.google.com](https://console.cloud.google.com)
+- Create a project (or use an existing one)
+- Enable the **Google Sheets API**
+- Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+- Application type: **Desktop app**
+- Download the JSON → save as `lead-gen/credentials.json`
+
+**4. Authorize Google Sheets (one time)**
+
+```bash
+npm run auth
+# Opens a URL — paste it in your browser, approve, paste the code back
+# Saves token.json — subsequent runs use this automatically
+```
+
+**5. Verify everything is connected**
+
+```bash
+npm run setup
+```
+
+This checks env vars, pings Apollo, confirms the spreadsheet is accessible, and shows the cron schedule. Fix anything flagged before continuing.
+
+**6. First real run**
+
+```bash
+node index.js --now
+```
+
+This runs the full workflow immediately AND starts the daily 7am cron. Check your Google Sheet — new leads should appear within a minute.
+
+**7. Keep it running**
+
+Use `pm2` to keep the process alive:
+```bash
+npm install -g pm2
+pm2 start index.js --name hvac-lead-gen
+pm2 save
+pm2 startup   # auto-start on reboot
+```
+
+### What Gets Pulled
+
+| Column | Source |
+|---|---|
+| Date Added | Current date (auto) |
+| Business Name | Apollo organization name |
+| Owner First Name | Apollo person first_name |
+| Owner Last Name | Apollo person last_name |
+| Phone Number | Person direct/mobile → org phone (priority order) |
+| City | Person city or organization city |
+| Website | Organization website_url |
+| Called | Blank — fill in manually |
+| Notes | Blank — fill in manually |
+
+### Search Filters (edit in `lead-gen/config.js`)
+
+- **Cities:** St. Joseph, Benton Harbor, Kalamazoo, Holland, Grand Haven, Muskegon, South Haven
+- **Industries:** HVAC, heating, air conditioning, plumbing, mechanical contractor
+- **Titles:** Owner → President → Founder → Co-Founder → General Manager
+- **Company size:** 1–25 employees
+- **Requires:** At least one phone number on file in Apollo
+
+### Error Handling
+
+If Apollo returns 0 results or the Sheets write fails, you'll see a detailed console error. If `SMTP_USER` and `SMTP_PASS` are set in `.env`, an email alert is also sent to `NOTIFICATION_EMAIL`.
+
+---
+
+## Tool 2 — n8n Business Outreach Agent
 
 An automated lead generation and ringless voicemail outreach system built on n8n.
 It scrapes local business phone numbers via Apify, scores leads with AI, logs everything
