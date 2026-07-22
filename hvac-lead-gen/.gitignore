@@ -1,0 +1,8 @@
+node_modules/
+
+# Local environment — never commit API keys
+.env
+
+# Google OAuth credentials and token — keep these off GitHub
+credentials/google-credentials.json
+credentials/token.json
