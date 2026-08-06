@@ -1,0 +1,19 @@
+{
+  "name": "hvac-lead-gen",
+  "version": "1.0.0",
+  "description": "Automated HVAC lead generation: Apollo.io search → Google Sheets",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js --cron",
+    "run-once": "node index.js",
+    "test-connection": "node index.js --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "googleapis": "^140.0.1",
+    "node-cron": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
