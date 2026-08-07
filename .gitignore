@@ -1,0 +1,8 @@
+# Environment secrets — never commit these
+.env
+google-service-account.json
+*.json.key
+
+# Node
+node_modules/
+npm-debug.log*
