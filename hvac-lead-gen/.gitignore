@@ -1,0 +1,10 @@
+# Never commit secrets
+.env
+credentials/
+
+# Dependencies
+node_modules/
+
+# Runtime logs
+error.log
+*.log

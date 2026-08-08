@@ -1,0 +1,20 @@
+{
+  "name": "hvac-lead-gen",
+  "version": "1.0.0",
+  "description": "Apollo.io → Google Sheets HVAC lead generation for Southwest Michigan — runs daily at 7am ET",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "run-now": "node index.js --run-now",
+    "setup": "node setup-check.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "googleapis": "^144.0.0",
+    "node-cron": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
