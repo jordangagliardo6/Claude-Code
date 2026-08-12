@@ -1,4 +1,26 @@
-# n8n Business Outreach Agent
+# Business Outreach Automation Suite
+
+Two complementary lead generation tools — an n8n workflow for broad Google Maps scraping
+and a Node.js scheduler for targeted Apollo.io prospecting.
+
+---
+
+## 📁 `lead-gen/` — SW Michigan HVAC Lead Generator (Apollo.io + Google Sheets)
+
+A Node.js cron job that runs every morning at **7 AM Eastern Time** and:
+- Searches Apollo.io for HVAC / plumbing / mechanical company **owners** (1–25 employees) in Southwest Michigan
+- Enriches contacts to reveal direct or mobile phone numbers
+- Deduplicates against an existing Google Sheet
+- Appends up to 25 new leads per run: Date Added, Business Name, Owner First/Last Name, Phone, City, Website
+
+**Quick start:** See [`lead-gen/SETUP.md`](lead-gen/SETUP.md) for step-by-step instructions.
+
+**Your Google Sheet (already created):**
+https://docs.google.com/spreadsheets/d/1Z2CrAggrULqpiZSTDlG5muIxaO4SCSjdIUo-Do_sEus/edit
+
+---
+
+## 📁 n8n Business Outreach Agent
 
 An automated lead generation and ringless voicemail outreach system built on n8n.
 It scrapes local business phone numbers via Apify, scores leads with AI, logs everything

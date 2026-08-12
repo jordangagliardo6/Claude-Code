@@ -1,0 +1,20 @@
+{
+  "name": "sw-michigan-hvac-lead-gen",
+  "version": "1.0.0",
+  "description": "Automated HVAC lead generation for Southwest Michigan — Apollo.io + Google Sheets",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test-connection": "node index.js --test"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "googleapis": "^140.0.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
