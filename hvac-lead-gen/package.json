@@ -1,0 +1,21 @@
+{
+  "name": "hvac-lead-gen",
+  "version": "1.0.0",
+  "description": "Daily HVAC lead gen: Apollo.io search → Google Sheets, 7am ET, 25 leads/run",
+  "main": "index.js",
+  "scripts": {
+    "start": "TZ=America/New_York node index.js",
+    "verify": "node index.js --verify",
+    "run-now": "TZ=America/New_York node index.js --run-now",
+    "dev": "TZ=America/New_York npx nodemon index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "googleapis": "^140.0.1",
+    "node-cron": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
