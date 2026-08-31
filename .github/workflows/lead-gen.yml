@@ -1,0 +1,41 @@
+name: HVAC Lead Generation
+
+on:
+  # 7:00 AM Eastern = 12:00 PM UTC (11 AM UTC during EDT, 12 PM during EST)
+  # Using 12:00 UTC covers both EST (UTC-5) and EDT (UTC-4) conservatively.
+  # Adjust to "0 11 * * *" during daylight saving months if you prefer exact 7 AM.
+  schedule:
+    - cron: '0 12 * * *'
+
+  # Allow triggering manually from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  fetch-leads:
+    name: Fetch HVAC Leads
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: lead-gen/package.json
+
+      - name: Install dependencies
+        working-directory: lead-gen
+        run: npm install
+
+      - name: Run lead generation
+        working-directory: lead-gen
+        env:
+          APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          # Store the entire service account JSON as a single GitHub secret
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: node index.js --run-now
