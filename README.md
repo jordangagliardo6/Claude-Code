@@ -1,4 +1,19 @@
-# n8n Business Outreach Agent
+# Business Outreach Automation
+
+Two complementary tools for automated lead generation and outreach.
+
+---
+
+## Tool 1 — HVAC Lead Gen (Apollo.io + Google Sheets)
+
+A scheduled Node.js script that pulls HVAC owner-operator leads from Apollo.io
+and appends them to a Google Sheet every morning at 7 AM ET. No n8n required.
+
+**→ See [`hvac-lead-gen/`](./hvac-lead-gen/) for setup and usage.**
+
+---
+
+## Tool 2 — n8n Business Outreach Agent
 
 An automated lead generation and ringless voicemail outreach system built on n8n.
 It scrapes local business phone numbers via Apify, scores leads with AI, logs everything
