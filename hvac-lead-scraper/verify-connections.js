@@ -59,7 +59,7 @@ async function verifySheets() {
       spreadsheetId,
       range: 'A1:A1',
     });
-    console.log(`✅  connected (first cell: "${(res.data.values?.[0]?.[0]) || '(empty)'}")`);
+    console.log(`✅  connected (first cell: "${(res.data.values?.[0]?.[0]) || '(empty)'}")`)
     return true;
   } catch (err) {
     console.log('❌  ' + err.message);
