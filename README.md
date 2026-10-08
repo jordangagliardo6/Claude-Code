@@ -328,3 +328,128 @@ a separate n8n webhook workflow to log inbound calls back to your Google Sheet.
 - Keep your Google Sheet as your Do Not Call list and check it before each run.
 - B2B outreach (business to business) generally has more relaxed regulations than B2C.
 - Do not misrepresent yourself in voicemails.
+
+---
+
+# Apollo.io → Google Sheets — Daily Lead Workflow
+
+A lightweight Node.js script that replaces manual prospecting. Every day at
+7:00 AM Eastern it pulls up to 25 new HVAC / plumbing / mechanical company
+owners from Apollo.io for Southwest Michigan, deduplicates against the master
+Google Sheet, and appends only net-new contacts.
+
+**Target spreadsheet:** `HVAC Leads — SW Michigan (Master)`
+`https://docs.google.com/spreadsheets/d/1bTcYo6cfs2aTMbjzyD15FBMH3IQMGJP2Mt4MACJq6t8`
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `hvac-lead-workflow.js` | Main workflow — Apollo search, dedup, Sheet append, scheduler |
+| `setup.js` | One-time setup: verify Apollo key, authorize Google OAuth |
+| `package.json` | npm dependencies |
+| `.env.example` | Environment variable template — copy to `.env` |
+
+## Quick Start (First Time)
+
+### 1. Prerequisites
+
+- **Node.js 18+** — `node --version` to check
+- **Apollo.io account** with API access (Basic plan or above required for
+  People Search + Phone Enrichment)
+- **Google Cloud project** with the Sheets API enabled
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Set up environment variables
+
+```bash
+cp .env.example .env
+# Edit .env and fill in your APOLLO_API_KEY
+```
+
+### 4. Add Google Cloud credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create or select a project
+3. Enable the **Google Sheets API**
+4. Go to **APIs & Services → Credentials → Create OAuth 2.0 Client ID**
+5. Application type: **Desktop app**
+6. Download the JSON file, save it as `credentials.json` in this folder
+
+### 5. Run setup to verify and authorize
+
+```bash
+node setup.js
+```
+
+This will:
+- Confirm your Apollo API key connects
+- Open a Google authorization URL in your browser
+- Save an OAuth token (`token.json`) so the script can write to Sheets
+
+### 6. Test the full workflow
+
+```bash
+node hvac-lead-workflow.js --run-now
+```
+
+Check the console output. If it says `✓ Added N new leads`, open the
+spreadsheet and confirm the new rows appear at the bottom.
+
+### 7. Start the daily scheduler
+
+```bash
+node hvac-lead-workflow.js
+```
+
+This runs as a persistent process and fires at **7:00 AM Eastern** every day.
+To keep it running after you close your terminal, use **PM2**:
+
+```bash
+npm install -g pm2
+pm2 start hvac-lead-workflow.js --name hvac-leads
+pm2 save
+pm2 startup    # follow the printed command to auto-start on reboot
+```
+
+## What the Workflow Does Each Run
+
+1. **Apollo search** — queries the People Search API with:
+   - Titles: Owner, President, Founder, Co-Founder, General Manager
+   - Industries: HVAC, Heating & Air Conditioning, Plumbing, Mechanical Contracting
+   - Employee count: 1–25
+   - Location: Southwest Michigan cities + surrounding counties
+2. **Phone enrichment** — calls Apollo's Bulk People Match to reveal phone numbers
+3. **Deduplication** — reads column B (Business Name) from the sheet and skips
+   any company already listed
+4. **Append** — writes up to 25 new rows with: Date Added, Business Name,
+   Owner First/Last Name, Phone, City, Website (Called and Notes left blank)
+
+## Customizing
+
+| What to change | Where |
+|---|---|
+| Target cities / counties | `CONFIG.targetCities` array in `hvac-lead-workflow.js` |
+| Max leads per run | `CONFIG.maxLeadsPerRun` in `hvac-lead-workflow.js` |
+| Sheet tab name | `CONFIG.sheetName` in `hvac-lead-workflow.js` |
+| Run time | `CRON_SCHEDULE` env var or the default in `hvac-lead-workflow.js` |
+| Error notification email | `NOTIFY_EMAIL` env var |
+
+## Error Handling
+
+- If Apollo returns 0 results → logs a warning + sends email alert (if SMTP configured)
+- If no leads have phone numbers after enrichment → same
+- If Google Sheets write fails → error logged + email alert
+- Email alerts require `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` in `.env`
+  (see `.env.example` for Gmail App Password setup)
+
+## Apollo Plan Note
+
+The People Search endpoint and Phone Enrichment require at minimum an Apollo
+**Basic** paid plan. The free plan does not include API access to these endpoints.
+Upgrade at: https://app.apollo.io/#/settings/plans/upgrade
