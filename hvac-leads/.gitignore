@@ -1,0 +1,4 @@
+node_modules/
+.env
+credentials/google-oauth-client.json
+credentials/google-token.json
