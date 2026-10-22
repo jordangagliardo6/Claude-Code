@@ -1,0 +1,5 @@
+node_modules/
+.env
+*.json.key
+google-service-account-key.json
+scraper.log
