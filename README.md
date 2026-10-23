@@ -328,3 +328,164 @@ a separate n8n webhook workflow to log inbound calls back to your Google Sheet.
 - Keep your Google Sheet as your Do Not Call list and check it before each run.
 - B2B outreach (business to business) generally has more relaxed regulations than B2C.
 - Do not misrepresent yourself in voicemails.
+
+---
+
+# HVAC Lead Scraper — Apollo.io → Google Sheets
+
+Automated daily lead generation for HVAC businesses in Southwest Michigan.
+Searches Apollo.io each morning at 7 AM ET, pulls owner contact details,
+and appends up to 25 new leads to a Google Sheet — skipping duplicates.
+
+**Location:** `hvac-lead-scraper/`
+
+---
+
+## What It Does
+
+Each run (scheduled daily at 7 AM ET):
+1. Searches Apollo.io for HVAC / plumbing / mechanical contractor **owners** (1–25 employees) in St. Joseph, Benton Harbor, Kalamazoo, Holland, Grand Haven, Muskegon, and South Haven MI
+2. Pulls: Business Name, Owner First Name, Owner Last Name, Phone (mobile preferred), City, Website
+3. Reads your Google Sheet to skip any business already listed
+4. Appends up to 25 new rows with these columns:
+
+```
+Date Added | Business Name | Owner First | Owner Last | Phone | City | Website | Called | Notes
+```
+
+---
+
+## One-Time Setup
+
+### Step 1 — Copy environment variables
+
+```bash
+cd hvac-lead-scraper
+cp .env.example .env
+# Edit .env and fill in all four values
+```
+
+### Step 2 — Get your Apollo.io API key
+
+1. Go to [developer.apollo.io](https://developer.apollo.io) → **API Keys**
+2. Copy your key and paste it as `APOLLO_API_KEY` in `.env`
+
+### Step 3 — Create a Google Cloud Service Account
+
+This lets the script write to your sheet without interactive login.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a project (or use an existing one)
+3. Enable the **Google Sheets API** (search for it in "APIs & Services → Library")
+4. Go to **IAM & Admin → Service Accounts** → Create Service Account
+   - Name it anything (e.g. `hvac-lead-scraper`)
+   - No role required at the project level
+5. Open the service account → **Keys** tab → **Add Key → Create new key → JSON**
+6. Download the JSON file
+
+Convert it to a single-line string for your `.env`:
+```bash
+cat service-account-key.json | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)))"
+```
+Paste the output as `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env`.
+
+### Step 4 — Share your Google Sheet with the service account
+
+1. Open (or create) the Google Sheet you want leads appended to
+2. Click **Share** → paste the service account email (ends in `@....iam.gserviceaccount.com`) → give **Editor** access
+3. Copy the Sheet ID from the URL (`https://docs.google.com/spreadsheets/d/THIS_PART/edit`) and paste it as `GOOGLE_SHEET_ID` in `.env`
+
+### Step 5 — Set up email alerts (optional but recommended)
+
+Since the script runs unattended, email alerts tell you when something breaks.
+
+1. Enable 2-Step Verification on your Google account
+2. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → create an App Password for "Mail"
+3. Copy the 16-character password into `GMAIL_APP_PASSWORD` in `.env`
+4. Set `NOTIFICATION_EMAIL` to your Gmail address
+
+### Step 6 — Install dependencies
+
+```bash
+cd hvac-lead-scraper
+npm install
+```
+
+---
+
+## First Run — Verify Connections
+
+Before the scheduler starts, confirm both APIs are working:
+
+```bash
+node index.js --verify
+```
+
+Expected output:
+```
+  Checking Apollo.io API key...       ✓ Connected  (12,345 contacts available in MI)
+  Checking Google Sheet access...     ✓ Connected  (0 existing lead row(s) found)
+  Email notifications:                ✓ Configured
+
+✓ All required connections verified. Safe to run --run-now or start the scheduler.
+```
+
+If either check fails, the error message will tell you exactly what's wrong (wrong key, sheet not shared, etc.).
+
+### Run it immediately (first real run)
+
+```bash
+node index.js --run-now
+```
+
+This executes the full workflow right now **and** keeps the scheduler running for future 7 AM runs. You'll see each lead printed to the console as it's added to the sheet.
+
+---
+
+## Keeping It Running
+
+The scheduler needs the Node process to stay alive. Options:
+
+**Local machine (quick start):**
+```bash
+node index.js
+```
+Keep the terminal open, or use `screen`/`tmux`.
+
+**Background process with auto-restart (recommended for a server):**
+```bash
+npm install -g pm2
+pm2 start index.js --name hvac-lead-scraper
+pm2 save
+pm2 startup  # follow the printed command to survive reboots
+```
+
+**View live logs with pm2:**
+```bash
+pm2 logs hvac-lead-scraper
+```
+
+---
+
+## Customizing
+
+| What to change | Where |
+|---|---|
+| Target cities | `TARGET_CITIES` array at the top of `index.js` |
+| Max leads per run | `MAX_LEADS_PER_RUN` in `index.js` |
+| Schedule time | `CRON_SCHEDULE` in `index.js` (use [crontab.guru](https://crontab.guru)) |
+| Industry keywords | `INDUSTRY_KEYWORDS` in `apollo.js` |
+| Job title priority | `TITLE_PRIORITY_ORDER` in `apollo.js` |
+| Spreadsheet columns | `COLUMN_HEADERS` in `sheets.js` + the row array in `appendLeads()` |
+
+---
+
+## Error Handling
+
+| Scenario | What happens |
+|---|---|
+| Apollo returns 0 results | Sends email alert + logs warning; scheduler keeps running |
+| Apollo API key invalid / rate limit | Error caught, email alert sent with HTTP status and message |
+| Google Sheet write fails | Error caught, email alert sent with full stack trace |
+| Email config missing | Alert is console-logged only (no crash) |
+| Any unhandled error | Caught at the top level, email alert sent; next scheduled run is unaffected |
