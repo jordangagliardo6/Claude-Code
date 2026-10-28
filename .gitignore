@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment variables — NEVER commit real API keys
+.env
+
+# Google service account key — NEVER commit
+credentials/service-account.json
+credentials/*.json
+
+# Runtime logs
+logs/
+
+# OS / editor noise
+.DS_Store
+*.swp
+*.swo
