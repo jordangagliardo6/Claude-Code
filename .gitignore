@@ -1,0 +1,5 @@
+hvac-lead-scraper/.env
+hvac-lead-scraper/service-account.json
+hvac-lead-scraper/credentials.json
+hvac-lead-scraper/token.json
+hvac-lead-scraper/node_modules/
