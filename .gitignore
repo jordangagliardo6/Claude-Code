@@ -1,0 +1,6 @@
+
+# Apollo lead-gen
+apollo-lead-gen/node_modules/
+apollo-lead-gen/.env
+apollo-lead-gen/credentials.json
+apollo-lead-gen/token.json
